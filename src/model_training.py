@@ -1,9 +1,7 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.metrics import classification_report, confusion_matrix, roc_auc_score, roc_curve
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -59,9 +57,8 @@ def prepare_features_and_target(df):
     feature_columns = (debt_recovery_features + liquidity_features + 
                       cash_flow_features + sales_features + company_features)
     
-    # Encode categorical sector (though all are Food and Beverages now)
-    le_sector = LabelEncoder()
-    df['sector_encoded'] = le_sector.fit_transform(df['sector'])
+    # Encode categorical sector (Food and Beverages = 0)
+    df['sector_encoded'] = 0  # Since all are Food and Beverages
     feature_columns.append('sector_encoded')
     
     # Prepare features and target
@@ -78,11 +75,11 @@ def prepare_features_and_target(df):
     print(f"Features shape: {X.shape}")
     print(f"Feature columns: {feature_columns}")
     
-    return X, y, feature_columns, le_sector
+    return X, y, feature_columns
 
-def train_models(X, y):
+def train_gradient_boosting_model(X, y):
     """
-    Train multiple models and compare performance
+    Train Gradient Boosting model only
     """
     # Split data
     X_train, X_test, y_train, y_test = train_test_split(
@@ -92,287 +89,139 @@ def train_models(X, y):
     print(f"Training set: {X_train.shape}, Test set: {X_test.shape}")
     print(f"Training target distribution: {y_train.value_counts().to_dict()}")
     
-    # Scale features for models that need it
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled = scaler.transform(X_test)
+    # Train Gradient Boosting model
+    print("\nTraining Gradient Boosting Classifier...")
+    model = GradientBoostingClassifier(
+        n_estimators=100, 
+        random_state=42,
+        learning_rate=0.1,
+        max_depth=6
+    )
     
-    # Define models
-    models = {
-        'Random Forest': RandomForestClassifier(
-            n_estimators=100, 
-            random_state=42, 
-            class_weight='balanced'
-        ),
-        'Gradient Boosting': GradientBoostingClassifier(
-            n_estimators=100, 
-            random_state=42
-        ),
-        'Logistic Regression': LogisticRegression(
-            random_state=42, 
-            class_weight='balanced',
-            max_iter=1000
-        )
+    model.fit(X_train, y_train)
+    
+    # Make predictions
+    y_pred = model.predict(X_test)
+    y_pred_proba = model.predict_proba(X_test)[:, 1]
+    
+    # Calculate metrics
+    accuracy = model.score(X_test, y_test)
+    auc_score = roc_auc_score(y_test, y_pred_proba)
+    
+    # Cross-validation score
+    cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring='roc_auc')
+    
+    print(f"Accuracy: {accuracy:.4f}")
+    print(f"AUC Score: {auc_score:.4f}")
+    print(f"CV AUC: {cv_scores.mean():.4f} (+/- {cv_scores.std() * 2:.4f})")
+    
+    # Classification report
+    print(f"\nClassification Report:")
+    print(classification_report(y_test, y_pred))
+    
+    # Confusion Matrix
+    print(f"\nConfusion Matrix:")
+    cm = confusion_matrix(y_test, y_pred)
+    print(cm)
+    
+    model_results = {
+        'accuracy': accuracy,
+        'auc_score': auc_score,
+        'cv_mean': cv_scores.mean(),
+        'cv_std': cv_scores.std()
     }
     
-    # Train and evaluate models
-    model_results = {}
-    trained_models = {}
-    
-    for name, model in models.items():
-        print(f"\nTraining {name}...")
-        
-        # Use scaled data for logistic regression, original for tree-based models
-        if name == 'Logistic Regression':
-            model.fit(X_train_scaled, y_train)
-            y_pred = model.predict(X_test_scaled)
-            y_pred_proba = model.predict_proba(X_test_scaled)[:, 1]
-        else:
-            model.fit(X_train, y_train)
-            y_pred = model.predict(X_test)
-            y_pred_proba = model.predict_proba(X_test)[:, 1]
-        
-        # Calculate metrics
-        accuracy = model.score(X_test_scaled if name == 'Logistic Regression' else X_test, y_test)
-        auc_score = roc_auc_score(y_test, y_pred_proba)
-        
-        # Cross-validation score
-        cv_scores = cross_val_score(
-            model, 
-            X_train_scaled if name == 'Logistic Regression' else X_train, 
-            y_train, 
-            cv=5, 
-            scoring='roc_auc'
-        )
-        
-        model_results[name] = {
-            'model': model,
-            'accuracy': accuracy,
-            'auc_score': auc_score,
-            'cv_mean': cv_scores.mean(),
-            'cv_std': cv_scores.std(),
-            'predictions': y_pred,
-            'probabilities': y_pred_proba
-        }
-        
-        trained_models[name] = model
-        
-        print(f"Accuracy: {accuracy:.4f}")
-        print(f"AUC Score: {auc_score:.4f}")
-        print(f"CV AUC: {cv_scores.mean():.4f} (+/- {cv_scores.std() * 2:.4f})")
-        
-        # Classification report
-        print(f"\nClassification Report for {name}:")
-        print(classification_report(y_test, y_pred))
-    
-    return model_results, trained_models, scaler, X_test, y_test
+    return model, model_results, X_test, y_test, y_pred, y_pred_proba
 
-def analyze_feature_importance(models, feature_columns):
+def save_model_and_results(model, feature_columns, model_results):
     """
-    Analyze and visualize feature importance
-    """
-    print("\nFeature Importance Analysis:")
-    
-    # Get feature importance from Random Forest
-    rf_model = models['Random Forest']
-    feature_importance = pd.DataFrame({
-        'feature': feature_columns,
-        'importance': rf_model.feature_importances_
-    }).sort_values('importance', ascending=False)
-    
-    print("\nTop 10 Most Important Features (Random Forest):")
-    print(feature_importance.head(10))
-    
-    # Create feature importance plot
-    plt.figure(figsize=(12, 8))
-    plt.subplot(2, 1, 1)
-    sns.barplot(data=feature_importance.head(15), x='importance', y='feature')
-    plt.title('Top 15 Feature Importance (Random Forest)')
-    plt.xlabel('Importance Score')
-    
-    # Group features by category for analysis
-    feature_categories = {
-        'Debt Recovery': ['dso_days', 'cash_collection_ratio', 'avg_payment_delay_days', 
-                         'immediate_payment_rate', 'high_delay_payment_rate', 'dso_trend', 
-                         'collection_ratio_trend'],
-        'Liquidity': ['current_ratio', 'quick_ratio', 'total_net_cash_flow', 'avg_net_cash_flow',
-                     'cash_flow_volatility', 'liquidity_stress_ratio', 'cash_flow_trend', 'liquidity_trend'],
-        'Cash Flow Sync': ['inflow_outflow_ratio', 'expense_coverage_ratio', 'quarterly_inflows', 
-                          'quarterly_outflows', 'cash_flow_synchronization', 'sync_trend'],
-        'Sales Performance': ['avg_quarterly_revenue', 'revenue_trend', 'revenue_consistency', 
-                             'sales_receipts_lag', 'revenue_growth_rate', 'quarters_tracked'],
-        'Company Info': ['company_age_years', 'employee_count', 'sector_encoded']
-    }
-    
-    category_importance = {}
-    for category, features in feature_categories.items():
-        category_importance[category] = feature_importance[
-            feature_importance['feature'].isin(features)
-        ]['importance'].sum()
-    
-    plt.subplot(2, 1, 2)
-    categories = list(category_importance.keys())
-    importances = list(category_importance.values())
-    plt.bar(categories, importances)
-    plt.title('Feature Importance by Category')
-    plt.ylabel('Total Importance Score')
-    plt.xticks(rotation=45)
-    
-    plt.tight_layout()
-    plt.savefig('/Users/zayed/loan_eligibility_ml/models/feature_importance.png', dpi=300, bbox_inches='tight')
-    plt.show()
-    
-    return feature_importance
-
-def create_model_evaluation_plots(model_results, y_test):
-    """
-    Create evaluation plots for model comparison
-    """
-    plt.figure(figsize=(15, 10))
-    
-    # ROC Curves
-    plt.subplot(2, 3, 1)
-    for name, results in model_results.items():
-        fpr, tpr, _ = roc_curve(y_test, results['probabilities'])
-        plt.plot(fpr, tpr, label=f"{name} (AUC: {results['auc_score']:.3f})")
-    
-    plt.plot([0, 1], [0, 1], 'k--', alpha=0.5)
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('ROC Curves Comparison')
-    plt.legend()
-    
-    # Model Performance Comparison
-    plt.subplot(2, 3, 2)
-    models_names = list(model_results.keys())
-    accuracies = [model_results[name]['accuracy'] for name in models_names]
-    auc_scores = [model_results[name]['auc_score'] for name in models_names]
-    
-    x = np.arange(len(models_names))
-    width = 0.35
-    
-    plt.bar(x - width/2, accuracies, width, label='Accuracy', alpha=0.8)
-    plt.bar(x + width/2, auc_scores, width, label='AUC Score', alpha=0.8)
-    
-    plt.xlabel('Models')
-    plt.ylabel('Score')
-    plt.title('Model Performance Comparison')
-    plt.xticks(x, models_names, rotation=45)
-    plt.legend()
-    plt.ylim(0, 1)
-    
-    # Confusion Matrix for best model (highest AUC)
-    best_model_name = max(model_results.keys(), key=lambda x: model_results[x]['auc_score'])
-    best_predictions = model_results[best_model_name]['predictions']
-    
-    plt.subplot(2, 3, 3)
-    cm = confusion_matrix(y_test, best_predictions)
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues')
-    plt.title(f'Confusion Matrix - {best_model_name}')
-    plt.ylabel('True Label')
-    plt.xlabel('Predicted Label')
-    
-    # Cross-validation scores
-    plt.subplot(2, 3, 4)
-    cv_means = [model_results[name]['cv_mean'] for name in models_names]
-    cv_stds = [model_results[name]['cv_std'] for name in models_names]
-    
-    plt.bar(models_names, cv_means, yerr=cv_stds, capsize=5, alpha=0.8)
-    plt.ylabel('Cross-Validation AUC Score')
-    plt.title('Cross-Validation Performance')
-    plt.xticks(rotation=45)
-    
-    plt.tight_layout()
-    plt.savefig('/Users/zayed/loan_eligibility_ml/models/model_evaluation.png', dpi=300, bbox_inches='tight')
-    plt.show()
-    
-    return best_model_name
-
-def save_models_and_results(models, scaler, feature_columns, model_results, feature_importance):
-    """
-    Save trained models and results
+    Save Gradient Boosting model and results
     """
     models_dir = '/Users/zayed/loan_eligibility_ml/models'
     os.makedirs(models_dir, exist_ok=True)
     
-    # Save best model
-    best_model_name = max(model_results.keys(), key=lambda x: model_results[x]['auc_score'])
-    best_model = models[best_model_name]
-    
+    # Create simplified model artifacts (no scaler needed for Gradient Boosting)
     model_artifacts = {
-        'model': best_model,
-        'scaler': scaler,
+        'model': model,
         'feature_columns': feature_columns,
-        'model_name': best_model_name,
-        'performance_metrics': model_results[best_model_name]
+        'model_name': 'Gradient Boosting',
+        'performance_metrics': model_results,
+        'training_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     }
     
-    joblib.dump(model_artifacts, f'{models_dir}/loan_eligibility_model.pkl')
-    print(f"\nBest model ({best_model_name}) saved to: {models_dir}/loan_eligibility_model.pkl")
+    # Save the model
+    model_path = f'{models_dir}/loan_eligibility_model.pkl'
+    joblib.dump(model_artifacts, model_path)
+    print(f"\nGradient Boosting model saved to: {model_path}")
     
-    # Save all models
-    for name, model in models.items():
-        joblib.dump(model, f'{models_dir}/model_{name.lower().replace(" ", "_")}.pkl')
-    
-    # Save model evaluation report
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_path = f'{models_dir}/model_evaluation_report_{timestamp}.txt'
-    
-    with open(report_path, 'w') as f:
-        f.write("Loan Eligibility Model Evaluation Report\n")
-        f.write("=" * 45 + "\n\n")
-        f.write(f"Generated on: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-        f.write(f"Dataset: Food and Beverages SME Companies (Quarterly Assessment)\n")
-        f.write(f"Total companies: 10000\n\n")
+    return model_artifacts
+
+def validate_saved_model(model_path, X_test, y_test):
+    """
+    Validate that the saved model can be loaded and makes predictions
+    """
+    try:
+        print(f"\nValidating saved model at: {model_path}")
         
-        f.write("Model Performance Summary:\n")
-        f.write("-" * 25 + "\n")
-        for name, results in model_results.items():
-            f.write(f"\n{name}:\n")
-            f.write(f"  Accuracy: {results['accuracy']:.4f}\n")
-            f.write(f"  AUC Score: {results['auc_score']:.4f}\n")
-            f.write(f"  CV AUC: {results['cv_mean']:.4f} (+/- {results['cv_std'] * 2:.4f})\n")
+        # Load the saved model
+        loaded_artifacts = joblib.load(model_path)
+        loaded_model = loaded_artifacts['model']
+        feature_columns = loaded_artifacts['feature_columns']
         
-        f.write(f"\nBest Model: {best_model_name}\n")
-        f.write(f"Best AUC Score: {model_results[best_model_name]['auc_score']:.4f}\n\n")
+        # Make predictions with loaded model
+        y_pred_loaded = loaded_model.predict(X_test)
+        y_pred_proba_loaded = loaded_model.predict_proba(X_test)[:, 1]
         
-        f.write("Top 10 Most Important Features:\n")
-        f.write("-" * 30 + "\n")
-        for idx, row in feature_importance.head(10).iterrows():
-            f.write(f"  {row['feature']}: {row['importance']:.4f}\n")
-    
-    print(f"Model evaluation report saved to: {report_path}")
-    
-    return best_model_name, model_artifacts
+        # Calculate metrics
+        accuracy = loaded_model.score(X_test, y_test)
+        auc_score = roc_auc_score(y_test, y_pred_proba_loaded)
+        
+        print(f"✓ Model loaded successfully")
+        print(f"✓ Model type: {type(loaded_model).__name__}")
+        print(f"✓ Feature count: {len(feature_columns)}")
+        print(f"✓ Validation Accuracy: {accuracy:.4f}")
+        print(f"✓ Validation AUC: {auc_score:.4f}")
+        
+        # Test with a single sample
+        sample_prediction = loaded_model.predict(X_test.iloc[:1])
+        sample_proba = loaded_model.predict_proba(X_test.iloc[:1])[:, 1]
+        
+        print(f"✓ Sample prediction: {sample_prediction[0]} (confidence: {sample_proba[0]:.3f})")
+        
+        return True
+        
+    except Exception as e:
+        print(f"✗ Model validation failed: {str(e)}")
+        return False
 
 def main():
     """
-    Main model training pipeline
+    Main model training pipeline - Gradient Boosting only
     """
-    print("Starting Loan Eligibility Model Training Pipeline")
-    print("=" * 50)
+    print("Starting Loan Eligibility Model Training (Gradient Boosting)")
+    print("=" * 60)
     
     # Load and prepare data
     df = load_and_prepare_data()
-    X, y, feature_columns, le_sector = prepare_features_and_target(df)
+    X, y, feature_columns = prepare_features_and_target(df)
     
-    # Train models
-    model_results, trained_models, scaler, X_test, y_test = train_models(X, y)
+    # Train Gradient Boosting model
+    model, model_results, X_test, y_test, y_pred, y_pred_proba = train_gradient_boosting_model(X, y)
     
-    # Analyze feature importance
-    feature_importance = analyze_feature_importance(trained_models, feature_columns)
+    # Save model and results
+    model_artifacts = save_model_and_results(model, feature_columns, model_results)
     
-    # Create evaluation plots
-    best_model_name = create_model_evaluation_plots(model_results, y_test)
+    # Validate the saved model
+    model_path = '/Users/zayed/loan_eligibility_ml/models/loan_eligibility_model.pkl'
+    validation_success = validate_saved_model(model_path, X_test, y_test)
     
-    # Save models and results
-    best_model_name, model_artifacts = save_models_and_results(
-        trained_models, scaler, feature_columns, model_results, feature_importance
-    )
+    if validation_success:
+        print(f"\n✓ Model training and validation completed successfully!")
+    else:
+        print(f"\n✗ Model training completed but validation failed!")
     
-    print(f"\nModel training completed successfully!")
-    print(f"Best performing model: {best_model_name}")
-    print(f"Best AUC Score: {model_results[best_model_name]['auc_score']:.4f}")
+    print(f"Gradient Boosting AUC Score: {model_results['auc_score']:.4f}")
+    print(f"Model saved to: {model_path}")
     
     return model_artifacts
 
