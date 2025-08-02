@@ -1,0 +1,62 @@
+Quarterly Financial Feature Engineering - Feature Descriptions
+=================================================================
+
+This analysis aggregates transaction data into quarterly assessments
+to provide more stable and meaningful financial metrics for loan eligibility.
+
+Each quarter represents a 3-month period, allowing for:
+- More stable financial ratio calculations
+- Better trend analysis across quarters
+- Reduced noise from daily transaction variations
+- More realistic business cycle assessment
+
+Debt Recovery Efficiency (Quarterly Assessment):
+-----------------------------------------------
+  • dso_days: Days Sales Outstanding - average time to collect receivables (quarterly basis)
+  • cash_collection_ratio: Ratio of cash collected to total sales (quarterly average)
+  • avg_payment_delay_days: Average payment delay across all transactions (quarterly average)
+  • immediate_payment_rate: Percentage of payments received immediately (quarterly average)
+  • high_delay_payment_rate: Percentage of payments delayed > 60 days (quarterly average)
+  • dso_trend: Trend in DSO across quarters (negative = improving)
+  • collection_ratio_trend: Trend in collection ratio across quarters (positive = improving)
+  • quarters_of_data: Number of quarters with data
+
+Financial Liquidity (Quarterly Assessment):
+------------------------------------------
+  • current_ratio: Current Assets / Current Liabilities (quarterly average)
+  • quick_ratio: (Current Assets - Inventory) / Current Liabilities (quarterly average)
+  • avg_net_cash_flow: Average net cash flow per quarter
+  • total_net_cash_flow: Total net cash flow across all quarters
+  • cash_flow_volatility: Standard deviation of net cash flows (quarterly average)
+  • cash_flow_trend: Trend direction of cash flows across quarters (positive = improving)
+  • liquidity_trend: Trend in current ratio across quarters (positive = improving)
+  • liquidity_stress_ratio: Proportion of periods with negative cash flow (quarterly average)
+
+Cash Flow Synchronization (Quarterly Assessment):
+------------------------------------------------
+  • inflow_outflow_ratio: Total inflows / Total outflows (quarterly average)
+  • cash_flow_synchronization: Consistency of quarterly inflow/outflow ratios
+  • expense_coverage_ratio: Ability to cover expenses with inflows (quarterly average)
+  • sync_trend: Trend in synchronization across quarters (positive = improving)
+  • quarterly_inflows: Total inflows across all quarters
+  • quarterly_outflows: Total outflows across all quarters
+
+Sales Performance (Quarterly Assessment):
+----------------------------------------
+  • avg_quarterly_revenue: Average revenue per quarter
+  • revenue_trend: Trend direction of revenue across quarters (positive = growing)
+  • revenue_consistency: Inverse of coefficient of variation across quarters (higher = more consistent)
+  • sales_receipts_lag: Weighted average delay between sales and payment (quarterly average)
+  • revenue_growth_rate: Overall revenue growth rate from first to last quarter
+  • quarters_tracked: Number of quarters with revenue data
+
+Risk Scoring (Quarterly-Based):
+------------------------------
+  • debt_recovery_score: Score based on quarterly debt recovery efficiency (0-100)
+  • liquidity_score: Score based on quarterly financial liquidity (0-100)
+  • cash_flow_sync_score: Score based on quarterly cash flow synchronization (0-100)
+  • sales_performance_score: Score based on quarterly sales performance (0-100)
+  • overall_risk_score: Weighted average of all quarterly scores (0-100)
+  • risk_category: Categorical risk level based on quarterly assessment (High/Medium/Low/Very Low Risk)
+  • loan_eligible: Binary loan eligibility based on quarterly performance (1=eligible, 0=not eligible)
+

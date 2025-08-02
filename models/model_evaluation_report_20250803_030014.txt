@@ -1,0 +1,40 @@
+Loan Eligibility Model Evaluation Report
+=============================================
+
+Generated on: 2025-08-03 03:00:14
+Dataset: Food and Beverages SME Companies (Quarterly Assessment)
+Total companies: 2000
+
+Model Performance Summary:
+-------------------------
+
+Random Forest:
+  Accuracy: 0.9250
+  AUC Score: 0.9741
+  CV AUC: 0.9767 (+/- 0.0163)
+
+Gradient Boosting:
+  Accuracy: 0.9450
+  AUC Score: 0.9861
+  CV AUC: 0.9844 (+/- 0.0191)
+
+Logistic Regression:
+  Accuracy: 0.9125
+  AUC Score: 0.9776
+  CV AUC: 0.9775 (+/- 0.0105)
+
+Best Model: Gradient Boosting
+Best AUC Score: 0.9861
+
+Top 10 Most Important Features:
+------------------------------
+  inflow_outflow_ratio: 0.1317
+  avg_net_cash_flow: 0.1093
+  liquidity_stress_ratio: 0.1052
+  expense_coverage_ratio: 0.0799
+  revenue_growth_rate: 0.0602
+  collection_ratio_trend: 0.0520
+  total_net_cash_flow: 0.0487
+  revenue_trend: 0.0456
+  cash_flow_synchronization: 0.0441
+  employee_count: 0.0362

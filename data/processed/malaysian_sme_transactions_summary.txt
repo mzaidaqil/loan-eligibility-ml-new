@@ -1,0 +1,36 @@
+Malaysian SME Transaction Data Summary
+========================================
+
+Total transaction records: 200000
+Unique companies: 10000
+Date range: 2024-01-01 08:03:00 to 2024-12-28 19:59:00
+
+Banking Details (Standardized):
+------------------------------
+RFI Entity ID: bank of sarawak
+RFI Bank Code: BS79334832456
+Transaction Channel: duitnow qr
+Transaction Type: qr pay
+
+Financial Metrics Summary:
+-------------------------
+transaction_amount:
+  Mean: RM2,474.56
+  Median: RM1,764.94
+  Std: RM2,321.96
+
+net_cash_flow:
+  Mean: RM-2,402.95
+  Median: RM-1,725.80
+  Std: RM3,059.35
+
+current_assets:
+  Mean: RM3,188.20
+  Median: RM2,033.12
+  Std: RM2,959.56
+
+current_liabilities:
+  Mean: RM1,395.12
+  Median: RM1,236.36
+  Std: RM1,014.93
+
