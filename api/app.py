@@ -36,10 +36,11 @@ def load_model():
     try:
         # Try multiple possible paths for Render deployment
         possible_paths = [
-            "/opt/render/project/src/models/loan_eligibility_model.pkl",
-            "models/loan_eligibility_model.pkl",
+            "models/loan_eligibility_model.pkl",                    # Most likely correct
             "./models/loan_eligibility_model.pkl",
-            "../models/loan_eligibility_model.pkl"
+            "/opt/render/project/models/loan_eligibility_model.pkl", # Render specific
+            "../models/loan_eligibility_model.pkl",
+            "loan_eligibility_model.pkl"                           # If in root
         ]
         
         model_path = None
@@ -52,6 +53,9 @@ def load_model():
             print("❌ Model file not found in any expected location")
             print(f"Current working directory: {os.getcwd()}")
             print(f"Directory contents: {os.listdir('.')}")
+            # Also check if models directory exists
+            if os.path.exists('models'):
+                print(f"Models directory contents: {os.listdir('models')}")
             return False
         
         model_artifacts = joblib.load(model_path)
@@ -186,3 +190,38 @@ async def get_model_info():
         "feature_columns": model_artifacts.get('feature_columns', []),
         "training_date": model_artifacts.get('training_date', 'Unknown')
     }
+
+@app.get("/debug/files")
+async def debug_files():
+    """Debug endpoint to see what files Render can access"""
+    import os
+    debug_info = {
+        "current_directory": os.getcwd(),
+        "directory_contents": [],
+        "models_directory_exists": os.path.exists("models"),
+        "models_contents": []
+    }
+    
+    try:
+        debug_info["directory_contents"] = os.listdir(".")
+    except Exception as e:
+        debug_info["directory_error"] = str(e)
+    
+    try:
+        if os.path.exists("models"):
+            debug_info["models_contents"] = os.listdir("models")
+    except Exception as e:
+        debug_info["models_error"] = str(e)
+    
+    # Check if the specific model file exists
+    model_paths = [
+        "models/loan_eligibility_model.pkl",
+        "./models/loan_eligibility_model.pkl",
+        "/opt/render/project/models/loan_eligibility_model.pkl"
+    ]
+    
+    debug_info["model_file_checks"] = {}
+    for path in model_paths:
+        debug_info["model_file_checks"][path] = os.path.exists(path)
+    
+    return debug_info
