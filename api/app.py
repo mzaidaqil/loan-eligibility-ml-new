@@ -34,16 +34,33 @@ def load_model():
     """Load the trained model artifacts"""
     global model_artifacts
     try:
-        model_path = "/opt/render/project/src/models/loan_eligibility_model.pkl"
-        if not os.path.exists(model_path):
-            # Fallback path for local development
-            model_path = "models/loan_eligibility_model.pkl"
+        # Try multiple possible paths for Render deployment
+        possible_paths = [
+            "/opt/render/project/src/models/loan_eligibility_model.pkl",
+            "models/loan_eligibility_model.pkl",
+            "./models/loan_eligibility_model.pkl",
+            "../models/loan_eligibility_model.pkl"
+        ]
+        
+        model_path = None
+        for path in possible_paths:
+            if os.path.exists(path):
+                model_path = path
+                break
+        
+        if model_path is None:
+            print("❌ Model file not found in any expected location")
+            print(f"Current working directory: {os.getcwd()}")
+            print(f"Directory contents: {os.listdir('.')}")
+            return False
         
         model_artifacts = joblib.load(model_path)
-        print(f"✅ Model loaded: {model_artifacts['model_name']}")
+        print(f"✅ Model loaded from: {model_path}")
+        print(f"✅ Model name: {model_artifacts['model_name']}")
         return True
     except Exception as e:
         print(f"❌ Error loading model: {e}")
+        print(f"Current working directory: {os.getcwd()}")
         return False
 
 @app.on_event("startup")
